@@ -31,8 +31,8 @@ app.use(errorMiddleware);
 
 const port = process.env.PORT || 6001;
 const server = app.listen(port, () => {
-    console.log(`[ ready ] http://localhost:${port}/api`);
-    console.log(`[ ready ] http://localhost:${port}/docs`);
+    console.log(`[ ready ] http://localhost:${port}`);
+    console.log(`[ ready ] http://localhost:${port}/api-docs`);
 });
 
 server.on('error', (error) => {

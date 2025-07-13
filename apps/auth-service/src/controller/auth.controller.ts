@@ -13,6 +13,7 @@ import prisma from "@packages/libs/prisma";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { setCookies } from "../utils/cookies/set-cookies";
+import { JsonWebTokenError } from "jsonwebtoken";
 
 //Register
 export const userRegistration = async (
@@ -64,11 +65,12 @@ export const verifyUser = async (
     if(existingUser) {
       return next(new ValidationError("user already exists with this email"));
     }
-    //verify otp
+    //verify otp first
     await verifyOtp(email , otp , next);
+    
+    //only create user after OTP verification is successful
     const hashedPassword = await bcrypt.hash(password , 10);
-    //create user
-     await prisma.users.create({
+    await prisma.users.create({
       data: {
         name,
         email,
@@ -125,6 +127,85 @@ export const login = async (
         name: user.name,
         email: user.email,
       },
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+//refresh token
+export const refreshToken = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const refreshToken = req.cookies.refresh_token;
+    if(!refreshToken) {
+      return next(new ValidationError("refresh token is required"));
+    }
+    const decoded = jwt.verify(refreshToken, process.env.REFRESH_JWT_SECRET as string) as {id: string ; role: string};
+    if(!decoded || decoded.id || decoded.role) {
+     return new JsonWebTokenError("Forbidden!! Invalid refresh token");
+    }
+
+    // let account;
+    // if(decoded.role === "user") {
+    //   account = await prisma.users.findUnique({
+    //     where: {
+    //       id: decoded.id,
+    //     },
+    //   });
+    // } else if(decoded.role === "seller") {
+    //   account = await prisma.sellers.findUnique({
+    //     where: {
+    //       id: decoded.id,
+    //     },
+    //   });
+    // } else {
+    //   return next(new ValidationError("invalid role"));
+    // }
+
+
+    //check if user exists
+    const user = await prisma.users.findUnique({
+      where: {
+        id: decoded.id,
+      },
+    });
+    if(!user) {
+      return new AuthenticationError("user not found");
+    }
+
+    //generate new access token
+    const newaccessToken = jwt.sign({ id: user.id }, process.env.ACCESS_JWT_SECRET as string, { expiresIn: "15m" });
+    setCookies(res, "access_token", newaccessToken);
+
+    //send response
+    res.status(201).json({
+      success: true,
+      message: "Token refreshed successfully",
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+//get user details
+export const getUserDetails = async (
+  req: any,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const user = req.user;
+    if(!user) {
+      return next(new AuthenticationError("user not found"));
+    }
+    res.status(200).json({
+      success: true,
+      message: "User details fetched successfully",
+      user
     });
   } catch (error) {
     return next(error);

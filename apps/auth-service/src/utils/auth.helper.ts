@@ -61,13 +61,13 @@ export const verifyOtp = async (email: string , otp: number , next: NextFunction
     const fialedAttemptsKey = `otp_failed_attempts:${email}`;
     const failedAttempts = parseInt((await redis.get(fialedAttemptsKey)) || "0");
     if(storedOtp !== otp.toString()) {
-    if(failedAttempts >= 2) {
-        await redis.set(`otp_lock:${email}`, "true", "EX", 1800);
-        await redis.del(`otp:${email}`, fialedAttemptsKey);
-        return next(new ValidationError("too many failed attempts,account locked for 30 minutes"));
-    }
-    await redis.set(fialedAttemptsKey, (failedAttempts + 1).toString(), "EX", 300);
-    return next(new ValidationError(`Incorrect OTP, ${2 - failedAttempts} attempts left`));
+        if(failedAttempts >= 2) {
+            await redis.set(`otp_lock:${email}`, "true", "EX", 1800);
+            await redis.del(`otp:${email}`, fialedAttemptsKey);
+            throw next(new ValidationError("too many failed attempts,account locked for 30 minutes"));
+        }
+        await redis.set(fialedAttemptsKey, (failedAttempts + 1).toString(), "EX", 300);
+        throw next(new ValidationError(`Incorrect OTP, ${2 - failedAttempts} attempts left`));
     }
     await redis.del(`otp:${email}`,fialedAttemptsKey);
 } 
@@ -97,6 +97,8 @@ export const handleForgotPassword = async (req: Request, res: Response, next: Ne
         message: "OTP sent to your email",
     });
 }
+
+
 
 export const verifyForgotPasswordOtp = async (req: Request, res: Response, next: NextFunction) => {
     const { email, otp } = req.body;
