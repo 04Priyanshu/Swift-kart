@@ -7,6 +7,8 @@ import React, { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import axios, { AxiosError } from "axios";
 import countries from "apps/seller-ui/src/utils/countries";
+import CreateShop from "apps/seller-ui/src/shared/modules/auth/create-shop";
+import StripeLogo from 'apps/seller-ui/src/assets/svgs/stripe-logo';
 
 
 // Rectangular Box Animation Loader Component
@@ -28,16 +30,16 @@ const RectangularLoader = () => {
 };
 
 const Signup = () => {
-    const [activeStep, setActiveStep] = useState(1);
+    const [activeStep, setActiveStep] = useState(3);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [canResend, setCanResend] = useState(true);
   const [timer, setTimer] = useState(60);
   const [otp, setOtp] = useState(["", "", "", "", ""]);
   const [showOtp, setShowOtp] = useState(false);
-  const [userData, setUserData] = useState<FormData | null>(null);
+  const [sellerData, setSellerData] = useState<FormData | null>(null);
   const inputRefs = useRef<HTMLInputElement[]>([]);
-
+  const [sellerId, setSellerId] = useState<string | null>(null);
   const router = useRouter();
 
   const {
@@ -62,13 +64,13 @@ const Signup = () => {
   const signupMutation = useMutation({
     mutationFn: async (data: FormData) => {
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_SERVER_URL}/api/user-registration`,
+        `${process.env.NEXT_PUBLIC_SERVER_URL}/api/seller-registration`,
         data
       );
       return response.data;
     },
     onSuccess: (_, formData) => {
-      setUserData(formData);
+      setSellerData(formData);
       setShowOtp(true);
       setCanResend(false);
       setTimer(60);
@@ -83,18 +85,19 @@ const Signup = () => {
 
   const verifyOtpMutation = useMutation({
     mutationFn: async () => {
-      if (!userData) return;
+      if (!sellerData) return;
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_SERVER_URL}/api/verify-user`,
+        `${process.env.NEXT_PUBLIC_SERVER_URL}/api/verify-seller`,
         {
-          ...userData,
+          ...sellerData,
           otp: otp.join(""),
         }
       );
       return response.data;
     },
-    onSuccess: () => {
-      router.push("/login");
+    onSuccess: (data) => {
+      setSellerId(data?.seller?.id);
+      setActiveStep(2);
     },
     onError: (error: AxiosError) => {
       const errorMessage = (error.response?.data as { message: string })
@@ -137,10 +140,26 @@ const Signup = () => {
   };
 
   const resendOtp = () => {
-    if (userData) {
-      signupMutation.mutate(userData);
+    if (sellerData) {
+      signupMutation.mutate(sellerData);
     }
   };
+
+
+  const connectStripe = async () => {
+    try {
+        const response = await axios.post(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/create-stripe-link`,{
+            sellerId
+        })
+        if(response.data.url){
+            window.location.href = response.data.url;
+        }
+    } catch (error:any) {
+        console.log(error.response.data.message);
+    }
+  }
+
+
   return (
     <div className="w-full flex flex-col items-center pt-10 min-h-screen">
         {/* stepper */}
@@ -362,6 +381,28 @@ const Signup = () => {
             </div>
           )}
        </>
+    )}
+
+    {activeStep === 2 && (
+      <CreateShop sellerId={sellerId || ""} setActiveStep={setActiveStep}/>
+    )}
+
+    {activeStep === 3 && (
+      <div className="text-center">
+        <h3 className="text-2xl font-semibold text-center mb-4">
+          Connect Bank
+        </h3>
+        <p className="text-gray-500 text-sm mb-4">
+          Connect your bank account to start selling on Swiftkart.
+        </p>
+        <button
+          onClick={connectStripe}
+          className="w-full mt-4 text-lg p-2 rounded-md transition-all duration-200 bg-black text-white cursor-pointer hover:bg-gray-800 flex items-center justify-center gap-2"
+        >
+          Connect Stripe <StripeLogo size={24} className="text-white" />
+        </button>
+        
+      </div>
     )}
 </div>
     </div>

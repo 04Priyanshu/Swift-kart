@@ -1,5 +1,5 @@
 import express from "express";
-import { forgotPassword, getUserDetails, login, refreshToken, resetUserPassword, userRegistration, verifyUser, verifyUserForgotPasswordOtp } from "../controller/auth.controller";
+import { createShop, forgotPassword, getUserDetails, login, refreshToken, registerSeller, resetUserPassword, userRegistration, verifySeller, verifyUser, verifyUserForgotPasswordOtp } from "../controller/auth.controller";
 import isAuthenticated from "@packages/middleware/isAuthenticated";
 
 const router = express.Router();
@@ -12,5 +12,8 @@ router.post("/refresh-token-user" , refreshToken);
 router.post("/verify-forgot-password-user" , verifyUserForgotPasswordOtp);
 router.post("/reset-user-password" , resetUserPassword);
 router.get("/logged-in-user" , isAuthenticated, getUserDetails);
+router.post("/seller-registration" , registerSeller);
+router.post("/verify-seller" , verifySeller);
+router.post("/create-shop" , createShop);
 
 export default router;
