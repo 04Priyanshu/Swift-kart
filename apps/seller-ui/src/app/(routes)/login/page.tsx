@@ -57,15 +57,15 @@ const Login = () => {
 
   const loginMutation = useMutation({
     mutationFn: async(data: FormData) => {
-      const response = await axios.post(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/login-user`, data,{
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/login-seller`, data,{
         withCredentials: true,
       });
       return response.data;
     },
     onSuccess: () => {
       setServerError(null);
-      // Invalidate and refetch user data after successful login
-      queryClient.invalidateQueries({ queryKey: ["user"] });
+      // Invalidate and refetch seller data after successful login
+      queryClient.invalidateQueries({ queryKey: ["seller"] });
       router.push("/");
     },
     onError: (error: AxiosError) => {

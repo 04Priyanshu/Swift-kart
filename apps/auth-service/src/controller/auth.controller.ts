@@ -118,6 +118,9 @@ export const login = async (
       return next(new AuthenticationError("invalid email or password"));
     }
 
+    res.clearCookie("seller_access_token");
+    res.clearCookie("seller_refresh_token"); 
+
     //generate token and refresh token
     const accessToken = jwt.sign(
       { id: user.id },
@@ -149,12 +152,16 @@ export const login = async (
 
 //refresh token
 export const refreshToken = async (
-  req: Request,
+  req: any,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const refreshToken = req.cookies.refresh_token;
+    const refreshToken =
+    req.cookies["refresh_token"] ||
+    req.cookies["seller_refresh_token"] ||
+    req.headers.authorization?.split(" ")[1];
+
     if (!refreshToken) {
       return next(new ValidationError("refresh token is required"));
     }
@@ -166,40 +173,42 @@ export const refreshToken = async (
       return new JsonWebTokenError("Forbidden!! Invalid refresh token");
     }
 
-    // let account;
-    // if(decoded.role === "user") {
-    //   account = await prisma.users.findUnique({
-    //     where: {
-    //       id: decoded.id,
-    //     },
-    //   });
-    // } else if(decoded.role === "seller") {
-    //   account = await prisma.sellers.findUnique({
-    //     where: {
-    //       id: decoded.id,
-    //     },
-    //   });
-    // } else {
-    //   return next(new ValidationError("invalid role"));
-    // }
+    let account;
+    if(decoded.role === "user") {
+      account = await prisma.users.findUnique({
+        where: {
+          id: decoded.id,
+        },
+      });
+    } else if(decoded.role === "seller") {
+      account = await prisma.sellers.findUnique({
+        where: {
+          id: decoded.id,
+        },
+        include: {
+          shop: true,
+        },
+      });
 
-    //check if user exists
-    const user = await prisma.users.findUnique({
-      where: {
-        id: decoded.id,
-      },
-    });
-    if (!user) {
-      return new AuthenticationError("user not found");
-    }
+    } 
+
+    
 
     //generate new access token
     const newaccessToken = jwt.sign(
-      { id: user.id },
+      { id: decoded.id, role: decoded.role },
       process.env.ACCESS_JWT_SECRET as string,
       { expiresIn: "15m" }
     );
-    setCookies(res, "access_token", newaccessToken);
+    
+
+    if(decoded.role === "user") {
+      setCookies(res, "access_token", newaccessToken);
+    } else if(decoded.role === "seller") {
+      setCookies(res, "seller_access_token", newaccessToken);
+    }
+
+    req.role = decoded.role;
 
     //send response
     res.status(201).json({
@@ -353,7 +362,7 @@ export const verifySeller = async (
 
     //only create seller after OTP verification is successful
     const hashedPassword = await bcrypt.hash(password, 10);
-    await prisma.sellers.create({
+    const seller = await prisma.sellers.create({
       data: {
         name,
         email,
@@ -365,6 +374,7 @@ export const verifySeller = async (
     res.status(200).json({
       success: true,
       message: "Seller created successfully",
+      seller,
     });
   } catch (error) {
     return next(error);
@@ -379,6 +389,7 @@ export const createShop = async (
 ) => {
   try {
     const { name, bio, category, address, opening_hours, website, sellerId } = req.body;
+    console.log(req.body);
     if(!name || !bio || !category || !address || !opening_hours || !website || !sellerId) {
       return next(new ValidationError("all fields are required"));
     }
@@ -435,7 +446,7 @@ export const createStripeConnectLink = async (
 
     const account = await stripe.accounts.create({
       type: 'express',
-      country: 'IN',
+      country: 'US',
       email: seller?.email,
       capabilities: {
         transfers: {
@@ -502,8 +513,11 @@ if(!isMatch) {
   return next(new ValidationError("invalid email or password"));
 }
 
-const accessToken = jwt.sign({ id: seller.id }, process.env.ACCESS_JWT_SECRET as string, { expiresIn: "1h" });
-const refreshToken = jwt.sign({ id: seller.id }, process.env.REFRESH_JWT_SECRET as string, { expiresIn: "7d" });
+res.clearCookie("access_token");
+res.clearCookie("refresh_token");
+
+const accessToken = jwt.sign({ id: seller.id, role: "seller" }, process.env.ACCESS_JWT_SECRET as string, { expiresIn: "1h" });
+const refreshToken = jwt.sign({ id: seller.id, role: "seller" }, process.env.REFRESH_JWT_SECRET as string, { expiresIn: "7d" });
 
 //store tokens in cookies
 setCookies(res, "seller_access_token", accessToken);

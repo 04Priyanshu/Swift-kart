@@ -45,6 +45,7 @@ const CreateShop = ({sellerId,setActiveStep}:{sellerId:string,setActiveStep:(ste
             ...data,
             sellerId
         }
+        console.log('Creating shop with data:', shopData);
         createShopMutation.mutate(shopData);
       }
 
