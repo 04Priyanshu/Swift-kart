@@ -79,3 +79,11 @@ model sellers {
   updatedAt DateTime @updatedAt
   shopId String? @db.ObjectId
 }
+
+model siteConfig {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  categories String[]
+  subCategories Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
