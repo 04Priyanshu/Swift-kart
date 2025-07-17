@@ -1,6 +1,6 @@
 "use client";
 import ImagePlaceHolder from "apps/seller-ui/src/shared/components/image-placeholder";
-import axios from "axios";
+import axiosInstance from "../../../../utils/axiosInstance";
 import { ChevronRight } from "lucide-react";
 import ColorSelector from "packages/components/color-selector";
 import CustomSpecification from "packages/components/custom-specification";
@@ -11,6 +11,7 @@ import React, { useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import RichTextEditor from "packages/components/rich-text-editor";
 import { SizeSelector } from "packages/components/size-selector";
+import Link from "next/link";
 
 // Rectangular Box Animation Loader Component
 const RectangularLoader = () => {
@@ -47,8 +48,8 @@ const page = () => {
     queryKey: ["categories"],
     queryFn: async () => {
       try {
-        const res = await axios.get(
-          `${process.env.NEXT_PUBLIC_SERVER_URL}/product/api/get-categories`
+        const res = await axiosInstance.get(
+          `/product/api/get-categories`
         );
         return res.data;
       } catch (error) {
@@ -69,10 +70,9 @@ const page = () => {
   const selectedCategory = watch("category");
   const regularPrice = watch("regular_price");
 
-  const subCategoriesData = useMemo(()=>{
+  const subCategoriesData = useMemo(() => {
     return selectedCategory ? subCategories[selectedCategory] || [] : [];
-  },[selectedCategory,subCategories])
-
+  }, [selectedCategory, subCategories]);
 
   const handleImageChange = (file: File | null, index: number) => {
     const updatedImages = [...images];
@@ -84,9 +84,7 @@ const page = () => {
     setValue("images", updatedImages);
   };
 
-  const handleSaveDraft = () => {
-
-  }
+  const handleSaveDraft = () => {};
 
   const handleImageRemove = (index: number) => {
     setImages((prevImages) => {
@@ -118,9 +116,9 @@ const page = () => {
       </h2>
 
       <div className="flex items-center">
-        <span className="text-[#80Deea] cursor-pointer ">Dashboard</span>
-        <ChevronRight size={20} className="opacity-[.8]" />
-        <span className=" cursor-pointer ">Create Product</span>
+        <Link href="/dashboard" className="text-[#80Deea] cursor-pointer ">Dashboard</Link>
+        <ChevronRight size={20} color="white" className="opacity-[.8]" />
+        <Link href="/dashboard/create-product" className=" text-white cursor-pointer ">Create Product</Link>
       </div>
 
       {/* content layout */}
@@ -351,7 +349,6 @@ const page = () => {
                       ))}
                     </select>
                   )}
-
                 />
               )}
               {errors.category && (
@@ -388,7 +385,6 @@ const page = () => {
                       ))}
                     </select>
                   )}
-
                 />
                 {errors.sub_category && (
                   <p className="text-red-500 text-sm mt-1">
@@ -397,23 +393,31 @@ const page = () => {
                 )}
               </div>
 
-
               <div className="mt-2">
                 <label className="block font-semibold text-gray-300 mb-1">
                   Detailed Description (Min 100 words)
                 </label>
                 <Controller
-                name="detailed_description"
-                control={control}
-                rules={{required:"Detailed Description is required" ,
-                validate: (value) => {
-                  const wordCount = value?.split(/\s+/).filter((word : string)=> word).length;
-                  return wordCount >= 100 || `Detailed Description must be at least 100 words(Current: ${wordCount})`;
-                }
-                }}
-                render={({field})=>(
-                  <RichTextEditor value={field.value} onChange={field.onChange}/>
-                )}
+                  name="detailed_description"
+                  control={control}
+                  rules={{
+                    required: "Detailed Description is required",
+                    validate: (value) => {
+                      const wordCount = value
+                        ?.split(/\s+/)
+                        .filter((word: string) => word).length;
+                      return (
+                        wordCount >= 100 ||
+                        `Detailed Description must be at least 100 words(Current: ${wordCount})`
+                      );
+                    },
+                  }}
+                  render={({ field }) => (
+                    <RichTextEditor
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
+                  )}
                 />
                 {errors.detailed_description && (
                   <p className="text-red-500 text-sm mt-1">
@@ -422,19 +426,18 @@ const page = () => {
                 )}
               </div>
 
-
               <div className="mt-2">
-                
                 <Input
-                label = "Video URL"
-                placeholder="https://www.youtube.com/embed/dQw4w"
-                className="border-gray-700 bg-gray-900"
-                {...register("video_url",{
-                  pattern: {
-                    value: /^(https?:\/\/)?(www\.)?(youtube\.com\/embed\/[a-zA-Z0-9_-]+)$/,
-                    message: "Invalid YouTube Embed URL",
-                  },
-                })}
+                  label="Video URL"
+                  placeholder="https://www.youtube.com/embed/dQw4w"
+                  className="border-gray-700 bg-gray-900"
+                  {...register("video_url", {
+                    pattern: {
+                      value:
+                        /^(https?:\/\/)?(www\.)?(youtube\.com\/embed\/[a-zA-Z0-9_-]+)$/,
+                      message: "Invalid YouTube Embed URL",
+                    },
+                  })}
                 />
                 {errors.video_url && (
                   <p className="text-red-500 text-sm mt-1">
@@ -456,26 +459,26 @@ const page = () => {
 
               <div className="mt-2">
                 <Input
-                label="Sale Price"
-                placeholder="19$"
-                className="border-gray-700 bg-gray-900"
-                {...register("sale_price",{
-                  required: "Sale Price is required",
-                  valueAsNumber: true,
-                  min: {
-                    value: 1,
-                    message: "Sale Price must be greater than 0",
-                  },
-                  validate: (value) => {
-                    if (isNaN(value)) {
-                      return "Sale Price must be a number";
-                    }
-                    if (regularPrice && value >= regularPrice) {
-                      return "Sale Price must be less than Regular Price";
-                    }
-                    return true;
-                  },
-                })}
+                  label="Sale Price"
+                  placeholder="19$"
+                  className="border-gray-700 bg-gray-900"
+                  {...register("sale_price", {
+                    required: "Sale Price is required",
+                    valueAsNumber: true,
+                    min: {
+                      value: 1,
+                      message: "Sale Price must be greater than 0",
+                    },
+                    validate: (value) => {
+                      if (isNaN(value)) {
+                        return "Sale Price must be a number";
+                      }
+                      if (regularPrice && value >= regularPrice) {
+                        return "Sale Price must be less than Regular Price";
+                      }
+                      return true;
+                    },
+                  })}
                 />
                 {errors.sale_price && (
                   <p className="text-red-500 text-sm mt-1">
@@ -486,30 +489,30 @@ const page = () => {
 
               <div className="mt-2">
                 <Input
-                label="Stock"
-                placeholder="100"
-                className="border-gray-700 bg-gray-900"
-                {...register("stock",{
-                  required: "Stock is required",
-                  valueAsNumber: true,
-                  min: {
-                    value: 1,
-                    message: "Stock must be at least 1",
-                  },
-                  max: {
-                    value: 1000,
-                    message: "Stock must be less than 1000",
-                  },
-                  validate: (value) => {
-                    if (isNaN(value)) {
-                      return "Stock must be a number";
-                    }
-                    if(!Number.isInteger(value)){
-                      return "Stock must be an integer";
-                    }
-                    return true;
-                  },
-                })}
+                  label="Stock"
+                  placeholder="100"
+                  className="border-gray-700 bg-gray-900"
+                  {...register("stock", {
+                    required: "Stock is required",
+                    valueAsNumber: true,
+                    min: {
+                      value: 1,
+                      message: "Stock must be at least 1",
+                    },
+                    max: {
+                      value: 1000,
+                      message: "Stock must be less than 1000",
+                    },
+                    validate: (value) => {
+                      if (isNaN(value)) {
+                        return "Stock must be a number";
+                      }
+                      if (!Number.isInteger(value)) {
+                        return "Stock must be an integer";
+                      }
+                      return true;
+                    },
+                  })}
                 />
                 {errors.stock && (
                   <p className="text-red-500 text-sm mt-1">
@@ -519,7 +522,7 @@ const page = () => {
               </div>
 
               <div className="mt-2">
-                <SizeSelector control={control} errors={errors}/>
+                <SizeSelector control={control} errors={errors} />
               </div>
 
               <div className="mt-3">
@@ -528,29 +531,27 @@ const page = () => {
                 </label>
               </div>
             </div>
-
           </div>
-           
         </div>
       </div>
 
       <div className="mt-6 flex justify-end gap-3">
-              {isChanged && (
-                <button
-                type="button"
-                className="bg-gray-700 text-white px-4 py-2 rounded-md"
-                onClick={handleSaveDraft}
-                >
-                  Save Draft
-                </button>
-              )}
-              <button
-              type="submit"
-              className="bg-green-700 text-white px-4 py-2 rounded-md"
-              >
-                {isLoading ? <RectangularLoader /> : "Save Product"}
-              </button>
-            </div>
+        {isChanged && (
+          <button
+            type="button"
+            className="bg-gray-700 text-white px-4 py-2 rounded-md"
+            onClick={handleSaveDraft}
+          >
+            Save Draft
+          </button>
+        )}
+        <button
+          type="submit"
+          className="bg-green-700 text-white px-4 py-2 rounded-md"
+        >
+          {isLoading ? <RectangularLoader /> : "Save Product"}
+        </button>
+      </div>
     </form>
   );
 };
