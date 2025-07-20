@@ -292,3 +292,91 @@ export const getAllProducts = async (
     return next(error);
   }
 };
+
+//delete product
+export const deleteProduct = async (
+  req: any,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { productId } = req.params;
+    const product = await prisma.products.findUnique({
+      where: {
+        id:productId,
+      },
+      select:{
+        id:true,
+        shopId:true,
+        isDeleted:true,
+      }
+    });
+    if (!product) {
+      return next(new Error("Product not found"));
+    }
+
+    if(product.shopId !== req.seller.shop.id){
+      return next(new Error("You are not authorized to delete this product"));
+    }
+
+    if(product.isDeleted){
+      return next(new Error("Product is already deleted"));
+    }
+
+    const deletedProduct = await prisma.products.update({
+      where: {
+        id:productId,
+      },
+      data: {
+        isDeleted: true,
+        deletedAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    });
+    res.status(200).json({ message: "Product is scheduled for deletion in 24 hours , you can restore it anytime",deletedAt:deletedProduct.deletedAt });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const restoreProduct = async (
+  req: any,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { productId } = req.params;
+    const product = await prisma.products.findUnique({
+      where: {
+        id:productId,
+      },
+      select:{
+        id:true,
+        shopId:true,
+        isDeleted:true,
+      }
+    });
+    
+    
+    if (!product) {
+      return next(new Error("Product not found"));
+    }
+    if(product.shopId !== req.seller.shop.id){
+      return next(new Error("You are not authorized to restore this product"));
+    }
+    if(!product.isDeleted){
+      return res.status(400).json({ message: "Product is not in delete state" });
+    }
+   await prisma.products.update({
+      where: {
+        id:productId,
+      },
+      data: {
+        isDeleted: false,
+        deletedAt: null,
+      },
+    });
+    res.status(200).json({ message: "Product restored successfully" });
+  } catch (error) {
+    return res.status(500).json({ message: "Error restoring product" });
+  }
+}
