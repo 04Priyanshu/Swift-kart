@@ -1,7 +1,7 @@
 "use client";
 import ImagePlaceHolder from "apps/seller-ui/src/shared/components/image-placeholder";
 import axiosInstance from "../../../../utils/axiosInstance";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Wand, X } from "lucide-react";
 import ColorSelector from "packages/components/color-selector";
 import CustomSpecification from "packages/components/custom-specification";
 import CustomProperties from "packages/components/cutom-properties";
@@ -12,6 +12,10 @@ import { Controller, useForm } from "react-hook-form";
 import RichTextEditor from "packages/components/rich-text-editor";
 import { SizeSelector } from "packages/components/size-selector";
 import Link from "next/link";
+import Image from "next/image";
+import { enhancements } from "apps/seller-ui/src/utils/Ai.enhancment";
+import toast from "react-hot-toast";
+import { useRouter } from "next/navigation";
 
 // Rectangular Box Animation Loader Component
 const RectangularLoader = () => {
@@ -31,6 +35,11 @@ const RectangularLoader = () => {
   );
 };
 
+interface UploadedImage {
+  fileId: string;
+  file_url: string;
+}
+
 const page = () => {
   const {
     register,
@@ -42,15 +51,19 @@ const page = () => {
   } = useForm();
   const [openImageModal, setOpenImageModal] = useState(false);
   const [isChanged, setIsChanged] = useState(true);
-  const [images, setImages] = useState<(File | null)[]>([null]);
+  const [selectedImage, setSelectedImage] = useState("");
+  const [images, setImages] = useState<(UploadedImage | null)[]>([null]);
+  const [processing, setProcessing] = useState(false);
+  const [activeEnhancement, setActiveEnhancement] = useState("");
   const [loading, setLoading] = useState(false);
+  const [removingImageIndex, setRemovingImageIndex] = useState<number | null>(
+    null
+  );
   const { data, isLoading, isError } = useQuery({
     queryKey: ["categories"],
     queryFn: async () => {
       try {
-        const res = await axiosInstance.get(
-          `/product/api/get-categories`
-        );
+        const res = await axiosInstance.get(`/product/api/get-categories`);
         return res.data;
       } catch (error) {
         console.log(error);
@@ -60,8 +73,48 @@ const page = () => {
     retry: 2,
   });
 
-  const onSubmit = (data: any) => {
-    console.log(data);
+  const router = useRouter();
+
+  const applyTransformation = async (transformation: string) => {
+    if (!selectedImage || processing) return;
+
+    setProcessing(true);
+    setActiveEnhancement(transformation);
+
+    try {
+      const transformedUrl = `${selectedImage}?tr=${transformation}`;
+      setSelectedImage(transformedUrl);
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const { data: discountCodes = [], isLoading: discountCodesLoading } =
+    useQuery({
+      queryKey: ["shop-discount"],
+      queryFn: async () => {
+        const response = await axiosInstance.get(
+          `/product/api/get-discount-codes`
+        );
+
+        return response?.data?.discountCode || [];
+      },
+    });
+
+  const onSubmit = async (data: any) => {
+    try {
+      setLoading(true);
+      const response = await axiosInstance.post("/product/api/create-product", data);
+      toast.success(response?.data?.message);
+      router.push("/dashboard/all-products");
+    } catch (error:any) {
+      console.log(error);
+      toast.error(error?.response?.data?.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const categories = data?.categories || [];
@@ -74,34 +127,103 @@ const page = () => {
     return selectedCategory ? subCategories[selectedCategory] || [] : [];
   }, [selectedCategory, subCategories]);
 
-  const handleImageChange = (file: File | null, index: number) => {
-    const updatedImages = [...images];
-    updatedImages[index] = file;
-    if (index === images.length - 1 && images.length < 8) {
-      updatedImages.push(null);
+  const convertFileToBase64 = (file: File) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const validateImageFile = (file: File) => {
+    // Check file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+    if (file.size > maxSize) {
+      throw new Error("Image file size must be less than 5MB");
     }
-    setImages(updatedImages);
-    setValue("images", updatedImages);
+
+    // Check file type
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      throw new Error("Only JPEG, PNG, and WebP images are allowed");
+    }
+
+    return true;
+  };
+
+  const handleImageChange = async (file: File | null, index: number) => {
+    if (!file) return;
+
+    try {
+      // Validate file before processing
+      validateImageFile(file);
+
+      setLoading(true);
+      const fileName = await convertFileToBase64(file);
+
+      const response = await axiosInstance.post(
+        "/product/api/upload-product-image",
+        {
+          fileName,
+        }
+      );
+
+      const uploadedImage: UploadedImage = {
+        fileId: response?.data?.fileId,
+        file_url: response?.data?.file_url,
+      };
+      const updatedImages = [...images];
+      updatedImages[index] = uploadedImage;
+
+      if (index === images.length - 1 && images.length < 8) {
+        updatedImages.push(null);
+      }
+      setImages(updatedImages);
+      setValue("images", updatedImages);
+    } catch (error: any) {
+      console.error("Image upload error:", error);
+      // You can add a toast notification here to show the error to the user
+      alert(error.message || "Failed to upload image. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSaveDraft = () => {};
 
-  const handleImageRemove = (index: number) => {
-    setImages((prevImages) => {
-      let updatedImages = [...prevImages];
+  const handleImageRemove = async (index: number) => {
+    try {
+      setRemovingImageIndex(index);
+      const updatedImages = [...images];
 
-      if (index === -1) {
-        updatedImages[0] = null;
-      } else {
-        updatedImages.splice(index, 1);
+      const imageToRemove = updatedImages[index];
+
+      if (imageToRemove && typeof imageToRemove === "object") {
+        console.log(imageToRemove);
+        //delete out picture from imagekit
+        await axiosInstance.delete("/product/api/delete-product-image", {
+          data: {
+            fileId: imageToRemove?.fileId,
+          },
+        });
       }
 
-      if (updatedImages.includes(null) && updatedImages.length < 8) {
+      updatedImages.splice(index, 1);
+
+      // Only add null placeholder if we don't have any null placeholders and we're under the limit
+      const hasNullPlaceholder = updatedImages.some((img) => img === null);
+      if (!hasNullPlaceholder && updatedImages.length < 8) {
         updatedImages.push(null);
       }
-      return updatedImages;
-    });
-    setValue("images", images);
+
+      setImages(updatedImages);
+      setValue("images", updatedImages);
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setRemovingImageIndex(null);
+    }
   };
 
   return (
@@ -116,9 +238,16 @@ const page = () => {
       </h2>
 
       <div className="flex items-center">
-        <Link href="/dashboard" className="text-[#80Deea] cursor-pointer ">Dashboard</Link>
+        <Link href="/dashboard" className="text-[#80Deea] cursor-pointer ">
+          Dashboard
+        </Link>
         <ChevronRight size={20} color="white" className="opacity-[.8]" />
-        <Link href="/dashboard/create-product" className=" text-white cursor-pointer ">Create Product</Link>
+        <Link
+          href="/dashboard/create-product"
+          className=" text-white cursor-pointer "
+        >
+          Create Product
+        </Link>
       </div>
 
       {/* content layout */}
@@ -126,28 +255,54 @@ const page = () => {
         {/* left side image upload */}
 
         <div className="md:w-[35%]">
+          {loading && (
+            <div className="mb-4 p-4 bg-blue-900/20 border border-blue-500/30 rounded-md">
+              <div className="flex items-center gap-2">
+                <RectangularLoader />
+                <span className="text-blue-300 text-sm">
+                  Uploading image...
+                </span>
+              </div>
+            </div>
+          )}
+
+          {removingImageIndex !== null && (
+            <div className="mb-4 p-4 bg-red-900/20 border border-red-500/30 rounded-md">
+              <div className="flex items-center gap-2">
+                <RectangularLoader />
+                <span className="text-red-300 text-sm">Removing image...</span>
+              </div>
+            </div>
+          )}
+
           {images?.length > 0 && (
             <ImagePlaceHolder
               setOpenImageModal={setOpenImageModal}
               size="765 x 850"
               small={false}
               onImageChange={handleImageChange}
+              setSelectedImage={setSelectedImage}
               onRemove={handleImageRemove}
-              defaultImage={null}
+              images={images}
+              defaultImage={images[0]?.file_url || null}
               index={0}
+              removingImageIndex={removingImageIndex}
             />
           )}
           <div className="grid grid-cols-2 gap-3 mt-4">
-            {images?.slice(1)?.map((_, index) => (
+            {images?.slice(1)?.map((image, index) => (
               <ImagePlaceHolder
                 setOpenImageModal={setOpenImageModal}
                 key={index}
                 size="300 x 300"
                 small={true}
                 onImageChange={handleImageChange}
+                setSelectedImage={setSelectedImage}
+                images={images}
                 onRemove={handleImageRemove}
-                defaultImage={null}
+                defaultImage={image?.file_url || null}
                 index={index + 1}
+                removingImageIndex={removingImageIndex}
               />
             ))}
           </div>
@@ -175,13 +330,13 @@ const page = () => {
               <div className="mt-2">
                 <Input
                   type="textarea"
-                  label="Product Description"
+                  label="Short Description"
                   className="border-gray-700 bg-gray-900"
                   rows={7}
                   cols={10}
-                  placeholder="Enter Product Description"
-                  {...register("description", {
-                    required: "Product Description is required",
+                  placeholder="Enter Short Description"
+                  {...register("short_description", {
+                    required: "Short Description is required",
                     validate: (value) => {
                       const wordCount = value.trim().split(/\s+/).length;
                       return (
@@ -191,9 +346,9 @@ const page = () => {
                     },
                   })}
                 />
-                {errors.description && (
+                {errors.short_description && (
                   <p className="text-red-500 text-sm mt-1">
-                    {errors.description.message as string}
+                    {errors.short_description.message as string}
                   </p>
                 )}
               </div>
@@ -362,7 +517,7 @@ const page = () => {
                   Sub Category
                 </label>
                 <Controller
-                  name="sub_category"
+                  name="subCategory"
                   control={control}
                   rules={{ required: "Sub Category is required" }}
                   render={({ field }) => (
@@ -386,9 +541,9 @@ const page = () => {
                     </select>
                   )}
                 />
-                {errors.sub_category && (
+                {errors.subCategory && (
                   <p className="text-red-500 text-sm mt-1">
-                    {errors.sub_category.message as string}
+                    {errors.subCategory.message as string}
                   </p>
                 )}
               </div>
@@ -454,8 +609,17 @@ const page = () => {
                   type="number"
                   className="border-gray-700 bg-gray-900"
                   placeholder="21$"
+                  {...register("regular_price", {
+                    required: "Regular Price is required",
+                    valueAsNumber: true,
+                    min: {
+                      value: 1,
+                      message: "Regular Price must be greater than 0",
+                    },
+                  })}
                 />
               </div>
+
 
               <div className="mt-2">
                 <Input
@@ -529,11 +693,94 @@ const page = () => {
                 <label className="block font-semibold text-gray-300 mb-1">
                   Select Discount Codes(optional)
                 </label>
+                {discountCodesLoading ? (
+                  <RectangularLoader />
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {discountCodes.map((code: any) => (
+                      <button
+                        onClick={() => {
+                          const currentSelection = watch("discountCodes") || [];
+                          const updatedSelection = currentSelection.includes(
+                            code?.id
+                          )
+                            ? currentSelection.filter(
+                                (id: string) => id !== code?.id
+                              )
+                            : [...currentSelection, code?.id];
+                          setValue("discountCodes", updatedSelection);
+                        }}
+                        type="button"
+                        key={code?.id}
+                        className={`px-3 py-1 rounded-md text-sm font-semibold border ${
+                          watch("discountCodes")?.includes(code?.id)
+                            ? "bg-green-500 text-white"
+                            : "bg-gray-900 text-white"
+                        }`}
+                      >
+                        {code?.public_name}({code?.discountValue}
+                        {code?.discountType === "percentage" ? "%" : "$"})
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {openImageModal && (
+        <div className="fixed top-0 left-0 w-full h-full bg-blac k bg-opacity-60 flex justify-center items-center z-50">
+          <div className="bg-gray-800 p-6 rounded-lg w-[450px] text-white">
+            <div className="flex justify-between items-between pb-3 mb-4">
+              <h2 className="text-lg font-semibold">Enhance Image</h2>
+              <X
+                size={20}
+                onClick={() => setOpenImageModal(false)}
+                className="cursor-pointer"
+              />
+            </div>
+
+            <div className="relative w-full h-[250px] rounded-md overflow-hidden border border-gray-600">
+              <Image
+                src={selectedImage}
+                alt="product-image"
+                height={250}
+                width={450}
+                className="w-full h-full object-cover"
+                quality={100}
+                unoptimized={false}
+                placeholder="empty"
+              />
+            </div>
+            {selectedImage && (
+              <div className="mt-4 space-y-2">
+                <h3 className="text-white text-sm font-semibold">
+                  AI Enhancements
+                </h3>
+                <div className="grid grid-cols-2 gap-3 max-h-[250px] overflow-y-auto">
+                  {enhancements.map(({ label, effect }) => (
+                    <button
+                      key={effect}
+                      className={` p-8 flex items-center gap-2 rounded-md ${
+                        activeEnhancement === effect
+                          ? "bg-green-500 text-white"
+                          : "bg-gray-700 hover:bg-gray-900"
+                      }`}
+                      onClick={() => applyTransformation(effect)}
+                      disabled={processing}
+                    >
+                      <Wand size={20} />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="mt-6 flex justify-end gap-3">
         {isChanged && (
