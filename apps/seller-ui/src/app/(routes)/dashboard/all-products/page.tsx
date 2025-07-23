@@ -15,7 +15,7 @@ import DeleteConfirmationModal from 'apps/seller-ui/src/shared/components/modals
 
 
 const fetchProducts = async () => {
-    const response = await axiosInstance.get("/product/api/get-all-products");
+    const response = await axiosInstance.get("/product/api/get-shop-products");
     return response?.data?.products;
 }
 

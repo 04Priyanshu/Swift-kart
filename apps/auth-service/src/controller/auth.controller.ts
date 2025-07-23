@@ -123,12 +123,12 @@ export const login = async (
 
     //generate token and refresh token
     const accessToken = jwt.sign(
-      { id: user.id },
+      { id: user.id, role: "user" },
       process.env.ACCESS_JWT_SECRET as string,
       { expiresIn: "1h" }
     );
     const refreshToken = jwt.sign(
-      { id: user.id },
+      { id: user.id, role: "user" },
       process.env.REFRESH_JWT_SECRET as string,
       { expiresIn: "7d" }
     );

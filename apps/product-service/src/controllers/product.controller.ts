@@ -3,6 +3,7 @@ import imagekit from "@packages/libs/imagekit";
 import prisma from "@packages/libs/prisma";
 import { log } from "console";
 import { Request, Response, NextFunction } from "express";
+import { Prisma } from "@prisma/client";
 
 //get product categories
 export const getProductCategories = async (
@@ -224,7 +225,7 @@ export const createProduct = async (
         warranty,
         cashOnDelivery: cash_on_delivery,
         slug,
-        //shopId: req.seller?.shop?.id!,
+        shopId: req.seller?.shop?.id!,
         tags: Array.isArray(tags) ? tags : tags.split(","),
         brand,
         video_url,
@@ -246,11 +247,11 @@ export const createProduct = async (
               url: image.file_url,
             })),
         },
-        shop:{
-            connect:{
-                id:req.seller.shop.id
-            }
-        }
+        // shop:{
+        //     connect:{
+        //         id:req.seller.shop.id
+        //     }
+        // }
       },
       include: { images: true },
     });
@@ -267,7 +268,7 @@ export const createProduct = async (
 };
 
 //get all products
-export const getAllProducts = async (
+export const getAllSellerProducts = async (
   req: any,
   res: Response,
   next: NextFunction
@@ -378,5 +379,86 @@ export const restoreProduct = async (
     res.status(200).json({ message: "Product restored successfully" });
   } catch (error) {
     return res.status(500).json({ message: "Error restoring product" });
+  }
+}
+
+//get seller stripe account
+export const getSellerStripeAccount = async (
+  req: any,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const seller = await prisma.sellers.findUnique({
+      where: {
+        id: req.seller.id,
+      },
+      select: {
+        stripeId: true,
+      },
+    });
+    res.status(200).json({ stripeId: seller?.stripeId });
+  } catch (error) {
+    return next(error);
+  }
+}
+export const getAllProducts = async (
+  req: any,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const skip = (page - 1) * limit;
+    const type = req.query.type as string;
+   
+    const baseFilter={
+    //   OR:[{
+    //     starting_date : null,
+    //   },
+    // {
+    //   ending_date : null,
+    // }]
+    }
+
+    const orderBy:Prisma.productsOrderByWithRelationInput=
+    type==="latest" ? {createdAt:"desc" as Prisma.SortOrder}:{totalSales:"desc" as Prisma.SortOrder}
+
+    const [products,total,top10Products]=await Promise.all([
+      prisma.products.findMany({
+       skip,
+       take:limit,
+       include:{
+        images:true,
+        shop:true,
+       },
+       where : baseFilter,
+       orderBy:{
+        totalSales:"desc",
+
+       },
+      }),
+      prisma.products.count({
+        where:baseFilter,
+      }),
+      prisma.products.findMany({
+        where:baseFilter,
+        orderBy,
+        take:10,
+      }),
+    ])
+
+    res.status(200).json({
+      products,
+      total,
+      top10Products,
+      top10By : type==="latest" ? "createdAt" : "totalSales",
+      currentPage:page,
+      totalPages:Math.ceil(total/limit),
+    })
+
+  }catch(error){
+    return next(error);
   }
 }
