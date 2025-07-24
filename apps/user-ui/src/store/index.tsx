@@ -10,7 +10,7 @@ type Product = {
   shopId: string;
 };
 
-type Store = {
+ type Store = {
   cart: Product[];
   wishlist: Product[];
   addToCart: (

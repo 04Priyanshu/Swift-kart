@@ -1,6 +1,6 @@
 import { Header } from '../shared/widgets';
 import './global.css';
-import { Oregano, Poppins , Roboto } from 'next/font/google';
+import { Jost, Oregano, Poppins , Roboto } from 'next/font/google';
 import Providers from './providers';
 
 export const metadata = {
@@ -26,6 +26,13 @@ const oregano = Oregano({
   variable: '--font-oregano',
 })
 
+const jost = Jost({
+  subsets: ['latin'],
+  weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
+  variable: '--font-jost',
+})
+
+
 export default function RootLayout({
   children,
 }: {
@@ -33,7 +40,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${roboto.variable} ${poppins.variable} ${oregano.variable}`}>
+      <body className={`${roboto.variable} ${poppins.variable} ${oregano.variable} ${jost.variable}`}>
         <Providers>
         <Header />
         {children}

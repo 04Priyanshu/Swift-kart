@@ -217,12 +217,12 @@ const ProductDetailsCard = ({
                   </button>
                 </div>
                 <button disabled={isInCart} className={`flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-800 transition ${isInCart ? "opacity-50 cursor-not-allowed" : ""}`} onClick={()=>{
-                  addToCart({...data,quantity,selectedOptions:{color:isSelected,size:isSizeSelected}},user,location,deviceInfo);
+                  addToCart({...data,quantity,selectedOptions:{colors:isSelected,sizes:isSizeSelected}},user,location,deviceInfo);
                 }}>
                   <ShoppingCartIcon size={20} />Add to Cart
                 </button>
                 <button  className={`opacity-[.7] cursor-pointer  ${isInWishlist ? "opacity-50 cursor-not-allowed" : ""}`} onClick={()=>{
-                 isInWishlist ? removeFromWishlist(data.id,user,location,deviceInfo) : addToWishlist({...data,quantity,selectedOptions:{color:isSelected,size:isSizeSelected}},user,location,deviceInfo);
+                 isInWishlist ? removeFromWishlist(data.id,user,location,deviceInfo) : addToWishlist({...data,quantity,selectedOptions:{colors:isSelected,sizes:isSizeSelected}},user,location,deviceInfo);
                 }}>
                   <Heart size={30} fill={isInWishlist ? "red" : "none"} color="black" />
                 </button>
