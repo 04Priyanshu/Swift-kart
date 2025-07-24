@@ -6,6 +6,10 @@ import { CarrotIcon, ChartArea, Heart, MapPin, ShoppingBag, ShoppingCartIcon, X 
 import { useRouter } from "next/navigation";
 import { P } from "node_modules/framer-motion/dist/types.d-Bq-Qm38R";
 import { spawn } from "child_process";
+import useUser from "apps/user-ui/src/hooks/useUser";
+import useLocation from "apps/user-ui/src/hooks/useLocation";
+import useDeviceTracking from "apps/user-ui/src/hooks/useDeviceTracking";
+import { useStore } from "apps/user-ui/src/store";
 
 const ProductDetailsCard = ({
   data,
@@ -22,6 +26,19 @@ const ProductDetailsCard = ({
 
   const estimatedDelivery = new Date();
   estimatedDelivery.setDate(estimatedDelivery.getDate() + 7);
+
+  const {user} = useUser();
+  const location = useLocation();
+  const deviceInfo = useDeviceTracking();
+
+  const addToCart = useStore((state : any)=>state.addToCart);
+  const addToWishlist = useStore((state : any)=>state.addToWishlist);
+  const removeFromWishlist = useStore((state : any)=>state.removeFromWishlist);
+  const cart = useStore((state : any)=>state.cart);
+  const isInCart = cart.some((item : any)=>item.id === data.id);
+
+  const wishlist = useStore((state : any)=>state.wishlist);
+  const isInWishlist = wishlist.some((item : any)=>item.id === data.id);
 
   return (
     <div
@@ -199,11 +216,15 @@ const ProductDetailsCard = ({
                     +
                   </button>
                 </div>
-                <button className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-800 transition">
+                <button disabled={isInCart} className={`flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-800 transition ${isInCart ? "opacity-50 cursor-not-allowed" : ""}`} onClick={()=>{
+                  addToCart({...data,quantity,selectedOptions:{color:isSelected,size:isSizeSelected}},user,location,deviceInfo);
+                }}>
                   <ShoppingCartIcon size={20} />Add to Cart
                 </button>
-                <button className="opacity-[.7] cursor-pointer  ">
-                  <Heart size={30} fill="#ff5722" color="black" />
+                <button  className={`opacity-[.7] cursor-pointer  ${isInWishlist ? "opacity-50 cursor-not-allowed" : ""}`} onClick={()=>{
+                 isInWishlist ? removeFromWishlist(data.id,user,location,deviceInfo) : addToWishlist({...data,quantity,selectedOptions:{color:isSelected,size:isSizeSelected}},user,location,deviceInfo);
+                }}>
+                  <Heart size={30} fill={isInWishlist ? "red" : "none"} color="black" />
                 </button>
               </div>
 
