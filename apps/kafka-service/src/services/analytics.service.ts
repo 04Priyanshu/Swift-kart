@@ -38,7 +38,7 @@ export const updateUserAnalytics = async (event: any) => {
       });
     }
     //remove from add to cart when remove from cart is triggered
-    else if (event.action === "remove_from_cart" && actionExists) {
+    else if (event.action === "remove_from_cart") {
       updatedActions = updatedActions.filter(
         (entry: any) =>
           !(
@@ -46,7 +46,7 @@ export const updateUserAnalytics = async (event: any) => {
             entry.action === "add_to_cart"
           )
       );
-    } else if (event.action === "remove_from_wishlist" && actionExists) {
+    } else if (event.action === "remove_from_wishlist") {
       updatedActions = updatedActions.filter(
         (entry: any) =>
           !(

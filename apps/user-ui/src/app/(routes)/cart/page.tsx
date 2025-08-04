@@ -45,7 +45,7 @@ const CartPage = () => {
   };
 
   const subTotal = cart.reduce(
-    (total: number, item: any) => total + item.quantity * item.sale_price,
+    (total: number, item: any) => total + item.quantity * (item.sale_price || item.price || 0),
     0
   );
 
@@ -85,14 +85,14 @@ const CartPage = () => {
                   <tr key={item.id} className="border-b border-b-[#0000000e]">
                     <td className="flex items-center gap-3 p-4">
                       <Image
-                        src={item?.images[0]?.url}
-                        alt={item.title}
+                        src={item?.images?.[0]?.url || item?.image || "/placeholder-image.jpg"}
+                        alt={item?.title || "Product"}
                         width={80}
                         height={80}
                         className="rounded"
                       />
                       <div className="flex flex-col gap-1">
-                        <span className="font-medium">{item.title}</span>
+                        <span className="font-medium">{item?.title || "Product"}</span>
                         {item?.selectedOptions && (
                           <div className="text-sm text-[#55585b]">
                             {item?.selectedOptions.colors && (
@@ -124,12 +124,12 @@ const CartPage = () => {
                       {item?.id === discountedProductId ? (
                         <div className="flex flex-col">
                           <span className="line-through text-sm text-[#55585b]">
-                            ${item.sale_price.toFixed(2)}
+                            ${(item.sale_price || item.price || 0).toFixed(2)}
                           </span>{" "}
                           <span className="text-green-600 font-semibold">
                             $
                             {(
-                              (item.sale_price * (100 - discountPercentage)) /
+                              ((item.sale_price || item.price || 0) * (100 - discountPercentage)) /
                               100
                             ).toFixed(2)}
                           </span>
@@ -138,7 +138,7 @@ const CartPage = () => {
                           </span>
                         </div>
                       ) : (
-                        <span>${item.sale_price.toFixed(2)}</span>
+                        <span>${(item.sale_price || item.price || 0).toFixed(2)}</span>
                       )}
                     </td>
                     <td>
